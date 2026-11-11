@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: ClearHorizons
+## Notes: Clears the volumetric fog and weather, and mutes weather sounds. /ch options for settings.
+## Version: 1.0.0
+## Author: zakarulcodes
+## SavedVariables: ClearHorizonsDB
+
+ClearHorizons.lua
