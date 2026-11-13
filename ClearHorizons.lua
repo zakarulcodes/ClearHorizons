@@ -257,7 +257,7 @@ local function BuildOptions()
 	-- Strength, only shown while fog removal is on
 	local strengthBlock = Block()
 	strengthBlock:SetPoint("TOPLEFT", fogBlock, "BOTTOMLEFT")
-	Text(strengthBlock, "GameFontHighlightSmall", "Strength", 14)
+	Text(strengthBlock, "GameFontHighlightSmall", "Fog removal strength", 14)
 	Text(strengthBlock, "GameFontDisableSmall", "Higher is smoother, but costs more FPS", 18)
 	local strengths = {}
 	for i = 1, MAX_STRENGTH do strengths[i] = { value = i, label = i } end
