@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: ClearHorizons
-## Notes: Clears the volumetric fog and weather, and mutes weather sounds. /ch options for settings.
-## Version: 1.0.0
+## Notes: Clears the volumetric fog, sets the weather level, and mutes weather sounds. /ch options for settings.
+## Version: 1.1.0
 ## Author: zakarulcodes
 ## SavedVariables: ClearHorizonsDB
 

@@ -40,12 +40,14 @@ local function Apply()
 	end)
 end
 
--- Weather (rain, snow, sandstorms) needs no flipping: setting the density to 0 once is enough.
--- Both the normal and the raid copies are set, as the raid one takes over in raids.
+-- Weather (rain, snow, sandstorms) needs no flipping: the chosen density, 0 (off) to 3 (heavy), is set
+-- directly. Both the normal and the raid copies are set, as the raid one takes over in raids.
 local WEATHER_CVARS = { "weatherDensity", "RAIDweatherDensity" }
+local WEATHER_LEVELS = { [0] = "Off", "Light", "Medium", "Heavy" }
 
--- A saved 0 means the weather was already off before (a manual /console, or a client that quit before
--- restoring), so unticking would change nothing. Use the game's default then, so unticking brings weather back.
+-- Put the player's own weather setting back on logout, so removing the addon undoes it. A saved 0
+-- means the weather was already forced off before (a manual /console, or a client that quit before
+-- restoring), so the game's default is used instead.
 local function RestoreWeather()
 	if not db.savedWeather then return end
 	for _, cvar in ipairs(WEATHER_CVARS) do
@@ -57,24 +59,22 @@ local function RestoreWeather()
 end
 
 local function ApplyWeather()
-	if not db.clearWeather then return RestoreWeather() end
 	if not db.savedWeather then
 		db.savedWeather = {}
 		for _, cvar in ipairs(WEATHER_CVARS) do db.savedWeather[cvar] = C_CVar.GetCVar(cvar) end
 	end
-	for _, cvar in ipairs(WEATHER_CVARS) do C_CVar.SetCVar(cvar, 0) end
+	for _, cvar in ipairs(WEATHER_CVARS) do C_CVar.SetCVar(cvar, db.weatherLevel) end
 end
 
--- Graphics presets and other addons can put the weather back. Check every few seconds and re-clear it.
--- A new non-zero value is the player's new real setting, so it becomes the one restored on logout.
+-- Graphics presets and other addons can change the weather. Check every few seconds and put the chosen
+-- level back. A changed non-zero value is the player's new own setting, so it is the one restored on logout.
 -- The fog needs no watchdog: the pulse rewrites volumeFogLevel every few frames anyway.
 local function EnforceWeather()
-	if not db.clearWeather then return end
 	for _, cvar in ipairs(WEATHER_CVARS) do
-		local value = C_CVar.GetCVar(cvar)
-		if value and tonumber(value) ~= 0 then
-			db.savedWeather[cvar] = value
-			C_CVar.SetCVar(cvar, 0)
+		local value = tonumber(C_CVar.GetCVar(cvar))
+		if value and value ~= db.weatherLevel then
+			if value ~= 0 then db.savedWeather[cvar] = value end
+			C_CVar.SetCVar(cvar, db.weatherLevel)
 		end
 	end
 end
@@ -123,8 +123,9 @@ local function SetEnabled(enabled)
 	Changed()
 end
 
-local function SetWeather(clear)
-	db.clearWeather = clear and true or false
+local function SetWeatherLevel(level)
+	db.weatherLevel = math.min(math.max(math.floor(level), 0), #WEATHER_LEVELS)
+	if db.weatherLevel > 0 then db.lastWeatherLevel = db.weatherLevel end -- for /ch weather to toggle back to
 	Changed()
 end
 
@@ -144,7 +145,7 @@ local options
 
 local function BuildOptions()
 	local win = CreateFrame("Frame", "ClearHorizonsOptions", UIParent, "BackdropTemplate")
-	win:SetSize(214, 178)
+	win:SetSize(240, 204)
 	win:SetPoint("CENTER")
 	win:SetFrameStrata("DIALOG")
 	win:SetClampedToScreen(true)
@@ -178,36 +179,53 @@ local function BuildOptions()
 		box:SetScript("OnClick", function(self) setter(self:GetChecked()) end)
 		return function() box:SetChecked(isOn()) end
 	end
-	local syncFog = AddToggle(-28, "Clear fog", function() return db.enabled end, SetEnabled)
-	local syncWeather = AddToggle(-52, "Clear weather", function() return db.clearWeather end, SetWeather)
-	local syncSounds = AddToggle(-76, "Mute weather sounds", function() return db.muteWeatherSounds end, SetWeatherSounds)
-
-	local caption = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	caption:SetPoint("TOPLEFT", 14, -110)
-	caption:SetText("Fog strength")
-
-	local hint = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	hint:SetPoint("TOPLEFT", caption, "BOTTOMLEFT", 0, -3)
-	hint:SetText("Higher = smoother, but costs more FPS")
-
-	-- One button per strength; the current one stays lit.
-	local steps = {}
-	for i = 1, MAX_STRENGTH do
-		local step = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-		step:SetSize(34, 22)
-		step:SetPoint("TOPLEFT", 12 + (i - 1) * 38, -140)
-		step:SetText(i)
-		step:SetScript("OnClick", function() SetStrength(i) end)
-		steps[i] = step
+	local function AddCaption(y, text)
+		local caption = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		caption:SetPoint("TOPLEFT", 14, y)
+		caption:SetText(text)
+		return caption
 	end
+
+	-- A row of buttons, one per value; the button for the current value stays lit.
+	local function AddButtonRow(y, values, width, onClick, current)
+		local buttons = {}
+		for i, value in ipairs(values) do
+			local button = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
+			button:SetSize(width, 22)
+			button:SetPoint("TOPLEFT", 12 + (i - 1) * (width + 4), y)
+			button:SetText(value.label)
+			button:SetScript("OnClick", function() onClick(value.value) end)
+			buttons[i] = button
+		end
+		return function()
+			for i, button in ipairs(buttons) do
+				if values[i].value == current() then button:LockHighlight() else button:UnlockHighlight() end
+			end
+		end
+	end
+
+	local syncFog = AddToggle(-28, "Clear fog", function() return db.enabled end, SetEnabled)
+
+	local strengthCaption = AddCaption(-60, "Fog strength")
+	local hint = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetPoint("TOPLEFT", strengthCaption, "BOTTOMLEFT", 0, -3)
+	hint:SetText("Higher = smoother, but costs more FPS")
+	local strengths = {}
+	for i = 1, MAX_STRENGTH do strengths[i] = { value = i, label = i } end
+	local syncStrength = AddButtonRow(-90, strengths, 34, SetStrength, function() return db.strength end)
+
+	AddCaption(-124, "Weather")
+	local levels = {}
+	for i = 0, #WEATHER_LEVELS do levels[i + 1] = { value = i, label = WEATHER_LEVELS[i] } end
+	local syncWeather = AddButtonRow(-140, levels, 50, SetWeatherLevel, function() return db.weatherLevel end)
+
+	local syncSounds = AddToggle(-170, "Mute weather sounds", function() return db.muteWeatherSounds end, SetWeatherSounds)
 
 	local function Sync()
 		syncFog()
+		syncStrength()
 		syncWeather()
 		syncSounds()
-		for i, step in ipairs(steps) do
-			if i == db.strength then step:LockHighlight() else step:UnlockHighlight() end
-		end
 	end
 	win:SetScript("OnShow", Sync)
 	tinsert(listeners, function() if win:IsShown() then Sync() end end)
@@ -268,7 +286,7 @@ local function BuildMinimapButton()
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:SetText("ClearHorizons")
 		GameTooltip:AddLine("Fog clearing: " .. OnOff(db.enabled) .. ", strength " .. db.strength, 1, 1, 1)
-		GameTooltip:AddLine("Weather clearing: " .. OnOff(db.clearWeather), 1, 1, 1)
+		GameTooltip:AddLine("Weather: " .. WEATHER_LEVELS[db.weatherLevel], 1, 1, 1)
 		GameTooltip:AddLine("Weather sounds muted: " .. OnOff(db.muteWeatherSounds), 1, 1, 1)
 		GameTooltip:AddLine("Left-click: options   Right-click: fog on/off   Drag: move", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
@@ -298,7 +316,8 @@ events:SetScript("OnEvent", function(_, event, name)
 		db = ClearHorizonsDB
 		if db.enabled == nil then db.enabled = true end
 		db.strength = db.strength or 3
-		if db.clearWeather == nil then db.clearWeather = true end
+		db.weatherLevel = db.weatherLevel or 0
+		db.clearWeather = nil -- replaced by weatherLevel in 1.1.0
 		if db.muteWeatherSounds == nil then db.muteWeatherSounds = true end
 		db.minimapAngle = db.minimapAngle or 220
 	elseif event == "PLAYER_LOGIN" then
@@ -321,7 +340,10 @@ SLASH_CLEARHORIZONS2 = "/clearhorizons"
 SlashCmdList.CLEARHORIZONS = function(msg)
 	msg = strtrim(msg or ""):lower()
 	local strength = tonumber(msg)
-	if strength then
+	local weatherLevel = tonumber(msg:match("^weather%s+(%d)$"))
+	if weatherLevel then
+		SetWeatherLevel(weatherLevel)
+	elseif strength then
 		db.enabled = true
 		SetStrength(strength)
 	elseif msg == "on" then
@@ -331,15 +353,15 @@ SlashCmdList.CLEARHORIZONS = function(msg)
 	elseif msg == "" then
 		SetEnabled(not db.enabled)
 	elseif msg == "weather" then
-		SetWeather(not db.clearWeather)
+		SetWeatherLevel(db.weatherLevel > 0 and 0 or (db.lastWeatherLevel or #WEATHER_LEVELS))
 	elseif msg == "sounds" then
 		SetWeatherSounds(not db.muteWeatherSounds)
 	elseif msg == "options" then
 		return ToggleOptions()
 	else
-		return say("usage: /ch (toggle fog)  /ch on|off  /ch 1-5 (strength)  /ch weather (toggle weather)  /ch sounds (toggle weather sounds)  /ch options")
+		return say("usage: /ch (toggle fog)  /ch on|off  /ch 1-5 (strength)  /ch weather (off/on)  /ch weather 0-3 (off to heavy)  /ch sounds (toggle weather sounds)  /ch options")
 	end
 	say(("fog %s, strength %d (flip every %d frame%s), weather %s, weather sounds %s"):format(db.enabled and "cleared" or "normal",
-		db.strength, FramesPerFlip(), FramesPerFlip() == 1 and "" or "s", db.clearWeather and "cleared" or "normal",
+		db.strength, FramesPerFlip(), FramesPerFlip() == 1 and "" or "s", WEATHER_LEVELS[db.weatherLevel]:lower(),
 		db.muteWeatherSounds and "muted" or "on"))
 end
