@@ -10,7 +10,7 @@ Many players get eye strain or headaches from the dense volumetric fog, and the 
 
 It always switches between fog levels **0 and 1**, the two cheapest levels. The fog is never visible either way, so there is no reason to pay for a higher quality level.
 
-**Weather.** Weather needs no trick. You pick a level, Off, Light, Medium or Heavy, and ClearHorizons sets `weatherDensity` and `RAIDweatherDensity` to it (0 to 3). It checks every 2 seconds and puts your level back if a graphics preset or another addon changed it.
+**Weather effects.** Weather needs no trick. You pick a level, Off, Light, Medium or Heavy, and ClearHorizons sets `weatherDensity` and `RAIDweatherDensity` to it (0 to 3). It checks every 2 seconds and puts your level back if a graphics preset or another addon changed it.
 
 **Weather sounds.** ClearHorizons can mute the rain, snow, sandstorm and thunder sounds with WoW's `MuteSoundFile`, while other ambient sounds (birds, crowds, water) keep playing. This works on its own, so you can keep the weather visible and only lose the sound.
 
@@ -39,15 +39,15 @@ Turn off any other fog addon in the AddOns list. Two addons changing the same se
 |---|---|
 | `/ch` | Turn fog clearing on or off |
 | `/ch on`, `/ch off` | Turn fog clearing on or off |
-| `/ch 1` to `/ch 5` | Set the strength (how often the fog setting changes) |
-| `/ch weather` | Switch weather between Off and your last level |
-| `/ch weather 0` to `/ch weather 3` | Set the weather level (0 Off, 1 Light, 2 Medium, 3 Heavy) |
+| `/ch 1` to `/ch 4` | Set the strength (how often the fog setting changes) |
+| `/ch weather` | Switch weather effects between Off and your last level |
+| `/ch weather 0` to `/ch weather 3` | Set the weather effects level (0 Off, 1 Light, 2 Medium, 3 Heavy) |
 | `/ch sounds` | Mute or unmute weather sounds |
 | `/ch options` | Open the options window |
 
-**Strength.** Strength 5 changes the setting every frame and strength 1 every 5th frame. Higher is smoother but costs more FPS, because the fog setting changes more often. Raise it if you see the fog flicker or the camera jitter.
+**Strength.** Strength 4 changes the setting every frame and strength 1 every 4th frame. Higher is smoother but costs more FPS, because the fog setting changes more often. Raise it if you see the fog flicker or the camera jitter.
 
-**Tip: cap your FPS.** At strength 5, every other frame is drawn at a different fog level, which can cause a slight jitter when you pan the camera. Setting Max Foreground FPS (System > Graphics) about 10 to 15% below your usual low FPS smooths it out.
+**Tip: cap your FPS.** At strength 4, every other frame is drawn at a different fog level, which can cause a slight jitter when you pan the camera. Setting Max Foreground FPS (System > Graphics) about 10 to 15% below your usual low FPS smooths it out.
 
 ## License
 

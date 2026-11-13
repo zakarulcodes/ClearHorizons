@@ -6,7 +6,7 @@ local ADDON_NAME = ...
 
 local CVAR = "volumeFogLevel"
 local LOW, HIGH = 0, 1
-local MAX_STRENGTH = 5
+local MAX_STRENGTH = 4 -- every 4th frame down to every frame; every 5th left the fog visibly flickering
 
 local db
 local pulse = CreateFrame("Frame")
@@ -214,7 +214,7 @@ local function BuildOptions()
 	for i = 1, MAX_STRENGTH do strengths[i] = { value = i, label = i } end
 	local syncStrength = AddButtonRow(-90, strengths, 34, SetStrength, function() return db.strength end)
 
-	AddCaption(-124, "Weather")
+	AddCaption(-124, "Weather effects")
 	local levels = {}
 	for i = 0, #WEATHER_LEVELS do levels[i + 1] = { value = i, label = WEATHER_LEVELS[i] } end
 	local syncWeather = AddButtonRow(-140, levels, 50, SetWeatherLevel, function() return db.weatherLevel end)
@@ -286,7 +286,7 @@ local function BuildMinimapButton()
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:SetText("ClearHorizons")
 		GameTooltip:AddLine("Fog clearing: " .. OnOff(db.enabled) .. ", strength " .. db.strength, 1, 1, 1)
-		GameTooltip:AddLine("Weather: " .. WEATHER_LEVELS[db.weatherLevel], 1, 1, 1)
+		GameTooltip:AddLine("Weather effects: " .. WEATHER_LEVELS[db.weatherLevel], 1, 1, 1)
 		GameTooltip:AddLine("Weather sounds muted: " .. OnOff(db.muteWeatherSounds), 1, 1, 1)
 		GameTooltip:AddLine("Left-click: options   Right-click: fog on/off   Drag: move", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
@@ -315,7 +315,7 @@ events:SetScript("OnEvent", function(_, event, name)
 		ClearHorizonsDB = ClearHorizonsDB or {}
 		db = ClearHorizonsDB
 		if db.enabled == nil then db.enabled = true end
-		db.strength = db.strength or 3
+		db.strength = math.min(db.strength or 3, MAX_STRENGTH)
 		db.weatherLevel = db.weatherLevel or 0
 		db.clearWeather = nil -- replaced by weatherLevel in 1.1.0
 		if db.muteWeatherSounds == nil then db.muteWeatherSounds = true end
@@ -359,9 +359,9 @@ SlashCmdList.CLEARHORIZONS = function(msg)
 	elseif msg == "options" then
 		return ToggleOptions()
 	else
-		return say("usage: /ch (toggle fog)  /ch on|off  /ch 1-5 (strength)  /ch weather (off/on)  /ch weather 0-3 (off to heavy)  /ch sounds (toggle weather sounds)  /ch options")
+		return say("usage: /ch (toggle fog)  /ch on|off  /ch 1-4 (strength)  /ch weather (weather effects off/on)  /ch weather 0-3 (off to heavy)  /ch sounds (toggle weather sounds)  /ch options")
 	end
-	say(("fog %s, strength %d (flip every %d frame%s), weather %s, weather sounds %s"):format(db.enabled and "cleared" or "normal",
+	say(("fog %s, strength %d (flip every %d frame%s), weather effects %s, weather sounds %s"):format(db.enabled and "cleared" or "normal",
 		db.strength, FramesPerFlip(), FramesPerFlip() == 1 and "" or "s", WEATHER_LEVELS[db.weatherLevel]:lower(),
 		db.muteWeatherSounds and "muted" or "on"))
 end
