@@ -144,7 +144,7 @@ end
 local options
 
 local function BuildOptions()
-	local PAD, WIDTH = 14, 260
+	local PAD, WIDTH, TOP = 14, 260, 42
 	local CONTENT = WIDTH - PAD * 2
 
 	local win = CreateFrame("Frame", "ClearHorizonsOptions", UIParent, "BackdropTemplate")
@@ -168,58 +168,57 @@ local function BuildOptions()
 	win:Hide()
 	tinsert(UISpecialFrames, "ClearHorizonsOptions") -- Escape closes it
 
-	-- Layout runs top to bottom; y is where the next element goes.
-	local y = -12
-
 	local logo = win:CreateTexture(nil, "ARTWORK")
 	logo:SetTexture("Interface\\Icons\\Spell_Nature_Cyclone")
 	logo:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 	logo:SetSize(20, 20)
-	logo:SetPoint("TOPLEFT", PAD, y)
+	logo:SetPoint("TOPLEFT", PAD, -12)
 	local title = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
 	title:SetText("ClearHorizons")
 	local close = CreateFrame("Button", nil, win, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", 0, 0)
-	y = y - 30
 
-	local function Divider()
-		local line = win:CreateTexture(nil, "ARTWORK")
+	-- The window is built from blocks stacked top to bottom, so a block can be hidden and the
+	-- ones below it move up. Inside a block, block.y is where the next row goes.
+	local function Block()
+		local block = CreateFrame("Frame", nil, win)
+		block:SetWidth(WIDTH)
+		block:SetHeight(1)
+		block.y = 0
+		return block
+	end
+
+	local function Advance(block, height)
+		block.y = block.y - height
+		block:SetHeight(-block.y)
+	end
+
+	local function Text(block, font, text, height)
+		local fs = block:CreateFontString(nil, "OVERLAY", font)
+		fs:SetPoint("TOPLEFT", PAD, block.y)
+		fs:SetText(text)
+		Advance(block, height)
+	end
+
+	local function Divider(block)
+		local line = block:CreateTexture(nil, "ARTWORK")
 		line:SetColorTexture(1, 1, 1, 0.12)
 		line:SetHeight(1)
-		line:SetPoint("TOPLEFT", PAD, y)
-		line:SetPoint("TOPRIGHT", -PAD, y)
-		y = y - 12
+		line:SetPoint("TOPLEFT", PAD, block.y - 2)
+		line:SetPoint("TOPRIGHT", -PAD, block.y - 2)
+		Advance(block, 14)
 	end
 
-	local function Text(font, text, height)
-		local fs = win:CreateFontString(nil, "OVERLAY", font)
-		fs:SetPoint("TOPLEFT", PAD, y)
-		fs:SetText(text)
-		y = y - height
-	end
-
-	local function Toggle(text, isOn, setter)
-		local box = CreateFrame("CheckButton", nil, win, "UICheckButtonTemplate")
-		box:SetSize(24, 24)
-		box:SetPoint("TOPLEFT", PAD - 4, y + 3)
-		box.Text:SetFontObject("GameFontHighlight")
-		box.Text:SetText(text)
-		box:SetScript("OnClick", function(self) setter(self:GetChecked()) end)
-		y = y - 26
-		return function() box:SetChecked(isOn()) end
-	end
-
-	-- A full-width row of flat buttons, one per value. The current value is filled gold;
-	-- the row fades while it has no effect (isActive returns false).
-	local function Segments(values, onClick, current, isActive)
+	-- A full-width row of flat buttons, one per value; the current value is filled gold.
+	local function Segments(block, values, onClick, current)
 		local gap = 4
 		local width = (CONTENT - gap * (#values - 1)) / #values
 		local buttons = {}
 		for i, value in ipairs(values) do
-			local button = CreateFrame("Button", nil, win, "BackdropTemplate")
+			local button = CreateFrame("Button", nil, block, "BackdropTemplate")
 			button:SetSize(width, 24)
-			button:SetPoint("TOPLEFT", PAD + (i - 1) * (width + gap), y)
+			button:SetPoint("TOPLEFT", PAD + (i - 1) * (width + gap), block.y)
 			button:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
 			button.label = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 			button.label:SetPoint("CENTER")
@@ -230,11 +229,9 @@ local function BuildOptions()
 			button:SetScript("OnClick", function() onClick(value.value) end)
 			buttons[i] = button
 		end
-		y = y - 34
+		Advance(block, 34)
 		return function()
-			local alpha = (isActive == nil or isActive()) and 1 or 0.4
 			for i, button in ipairs(buttons) do
-				button:SetAlpha(alpha)
 				if values[i].value == current() then
 					button:SetBackdropColor(0.55, 0.40, 0.06, 0.95)
 					button:SetBackdropBorderColor(1, 0.82, 0.2, 1)
@@ -248,32 +245,45 @@ local function BuildOptions()
 		end
 	end
 
+	local OFF_ON = { { value = false, label = "Off" }, { value = true, label = "On" } }
+
 	-- Fog
-	Text("GameFontNormal", "Fog", 20)
-	local syncFog = Toggle("Clear fog", function() return db.enabled end, SetEnabled)
-	Text("GameFontHighlightSmall", "Strength", 14)
-	Text("GameFontDisableSmall", "Higher is smoother, but costs more FPS", 18)
+	local fogBlock = Block()
+	fogBlock:SetPoint("TOPLEFT", 0, -TOP)
+	Text(fogBlock, "GameFontNormal", "Fog", 20)
+	Text(fogBlock, "GameFontHighlightSmall", "Remove fog", 18)
+	local syncFog = Segments(fogBlock, OFF_ON, SetEnabled, function() return db.enabled end)
+
+	-- Strength, only shown while fog removal is on
+	local strengthBlock = Block()
+	strengthBlock:SetPoint("TOPLEFT", fogBlock, "BOTTOMLEFT")
+	Text(strengthBlock, "GameFontHighlightSmall", "Strength", 14)
+	Text(strengthBlock, "GameFontDisableSmall", "Higher is smoother, but costs more FPS", 18)
 	local strengths = {}
 	for i = 1, MAX_STRENGTH do strengths[i] = { value = i, label = i } end
-	local syncStrength = Segments(strengths, SetStrength, function() return db.strength end, function() return db.enabled end)
-
-	Divider()
+	local syncStrength = Segments(strengthBlock, strengths, SetStrength, function() return db.strength end)
 
 	-- Weather
-	Text("GameFontNormal", "Weather", 20)
-	Text("GameFontHighlightSmall", "Weather effects", 18)
+	local weatherBlock = Block()
+	Divider(weatherBlock)
+	Text(weatherBlock, "GameFontNormal", "Weather", 20)
+	Text(weatherBlock, "GameFontHighlightSmall", "Weather effects", 18)
 	local levels = {}
 	for i = 0, #WEATHER_LEVELS do levels[i + 1] = { value = i, label = WEATHER_LEVELS[i] } end
-	local syncWeather = Segments(levels, SetWeatherLevel, function() return db.weatherLevel end)
-	local syncSounds = Toggle("Mute weather sounds", function() return db.muteWeatherSounds end, SetWeatherSounds)
-
-	win:SetHeight(-y + 8)
+	local syncWeather = Segments(weatherBlock, levels, SetWeatherLevel, function() return db.weatherLevel end)
+	Text(weatherBlock, "GameFontHighlightSmall", "Mute weather sounds", 18)
+	local syncSounds = Segments(weatherBlock, OFF_ON, SetWeatherSounds, function() return db.muteWeatherSounds end)
 
 	local function Sync()
 		syncFog()
 		syncStrength()
 		syncWeather()
 		syncSounds()
+		strengthBlock:SetShown(db.enabled)
+		local above = db.enabled and strengthBlock or fogBlock
+		weatherBlock:ClearAllPoints()
+		weatherBlock:SetPoint("TOPLEFT", above, "BOTTOMLEFT")
+		win:SetHeight(TOP + fogBlock:GetHeight() + (db.enabled and strengthBlock:GetHeight() or 0) + weatherBlock:GetHeight())
 	end
 	win:SetScript("OnShow", Sync)
 	tinsert(listeners, function() if win:IsShown() then Sync() end end)
