@@ -1,0 +1,5 @@
+package-as: ClearHorizons
+
+# Kept in the repo but left out of the addon zip.
+ignore:
+  - media

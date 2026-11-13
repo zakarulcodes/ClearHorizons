@@ -1,0 +1,23 @@
+# Pushing a version tag (for example v1.2.0) builds the addon zip and publishes it to
+# GitHub Releases and CurseForge with the BigWigs packager.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the packager builds the changelog from history
+
+      - uses: BigWigsMods/packager@v2
