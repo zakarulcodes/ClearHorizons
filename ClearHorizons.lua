@@ -44,10 +44,14 @@ end
 -- Both the normal and the raid copies are set, as the raid one takes over in raids.
 local WEATHER_CVARS = { "weatherDensity", "RAIDweatherDensity" }
 
+-- A saved 0 means the weather was already off before (a manual /console, or a client that quit before
+-- restoring), so unticking would change nothing. Use the game's default then, so unticking brings weather back.
 local function RestoreWeather()
 	if not db.savedWeather then return end
 	for _, cvar in ipairs(WEATHER_CVARS) do
-		if db.savedWeather[cvar] then C_CVar.SetCVar(cvar, db.savedWeather[cvar]) end
+		local value = db.savedWeather[cvar]
+		if not value or tonumber(value) == 0 then value = C_CVar.GetCVarDefault(cvar) end
+		if value then C_CVar.SetCVar(cvar, value) end
 	end
 	db.savedWeather = nil
 end
