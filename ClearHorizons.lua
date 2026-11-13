@@ -144,8 +144,11 @@ end
 local options
 
 local function BuildOptions()
+	local PAD, WIDTH = 14, 260
+	local CONTENT = WIDTH - PAD * 2
+
 	local win = CreateFrame("Frame", "ClearHorizonsOptions", UIParent, "BackdropTemplate")
-	win:SetSize(240, 204)
+	win:SetWidth(WIDTH)
 	win:SetPoint("CENTER")
 	win:SetFrameStrata("DIALOG")
 	win:SetClampedToScreen(true)
@@ -155,7 +158,8 @@ local function BuildOptions()
 		edgeSize = 14,
 		insets = { left = 3, right = 3, top = 3, bottom = 3 },
 	})
-	win:SetBackdropColor(0.04, 0.05, 0.08, 0.92)
+	win:SetBackdropColor(0.03, 0.04, 0.07, 0.95)
+	win:SetBackdropBorderColor(0.6, 0.6, 0.65, 1)
 	win:EnableMouse(true)
 	win:SetMovable(true)
 	win:RegisterForDrag("LeftButton")
@@ -164,62 +168,106 @@ local function BuildOptions()
 	win:Hide()
 	tinsert(UISpecialFrames, "ClearHorizonsOptions") -- Escape closes it
 
-	local heading = win:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	heading:SetPoint("TOPLEFT", 12, -10)
-	heading:SetText("ClearHorizons")
+	-- Layout runs top to bottom; y is where the next element goes.
+	local y = -12
 
+	local logo = win:CreateTexture(nil, "ARTWORK")
+	logo:SetTexture("Interface\\Icons\\Spell_Nature_Cyclone")
+	logo:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	logo:SetSize(20, 20)
+	logo:SetPoint("TOPLEFT", PAD, y)
+	local title = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
+	title:SetText("ClearHorizons")
 	local close = CreateFrame("Button", nil, win, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", 0, 0)
+	y = y - 30
 
-	local function AddToggle(y, text, isOn, setter)
+	local function Divider()
+		local line = win:CreateTexture(nil, "ARTWORK")
+		line:SetColorTexture(1, 1, 1, 0.12)
+		line:SetHeight(1)
+		line:SetPoint("TOPLEFT", PAD, y)
+		line:SetPoint("TOPRIGHT", -PAD, y)
+		y = y - 12
+	end
+
+	local function Text(font, text, height)
+		local fs = win:CreateFontString(nil, "OVERLAY", font)
+		fs:SetPoint("TOPLEFT", PAD, y)
+		fs:SetText(text)
+		y = y - height
+	end
+
+	local function Toggle(text, isOn, setter)
 		local box = CreateFrame("CheckButton", nil, win, "UICheckButtonTemplate")
 		box:SetSize(24, 24)
-		box:SetPoint("TOPLEFT", 10, y)
+		box:SetPoint("TOPLEFT", PAD - 4, y + 3)
+		box.Text:SetFontObject("GameFontHighlight")
 		box.Text:SetText(text)
 		box:SetScript("OnClick", function(self) setter(self:GetChecked()) end)
+		y = y - 26
 		return function() box:SetChecked(isOn()) end
 	end
-	local function AddCaption(y, text)
-		local caption = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		caption:SetPoint("TOPLEFT", 14, y)
-		caption:SetText(text)
-		return caption
-	end
 
-	-- A row of buttons, one per value; the button for the current value stays lit.
-	local function AddButtonRow(y, values, width, onClick, current)
+	-- A full-width row of flat buttons, one per value. The current value is filled gold;
+	-- the row fades while it has no effect (isActive returns false).
+	local function Segments(values, onClick, current, isActive)
+		local gap = 4
+		local width = (CONTENT - gap * (#values - 1)) / #values
 		local buttons = {}
 		for i, value in ipairs(values) do
-			local button = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-			button:SetSize(width, 22)
-			button:SetPoint("TOPLEFT", 12 + (i - 1) * (width + 4), y)
-			button:SetText(value.label)
+			local button = CreateFrame("Button", nil, win, "BackdropTemplate")
+			button:SetSize(width, 24)
+			button:SetPoint("TOPLEFT", PAD + (i - 1) * (width + gap), y)
+			button:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+			button.label = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			button.label:SetPoint("CENTER")
+			button.label:SetText(value.label)
+			local hover = button:CreateTexture(nil, "HIGHLIGHT")
+			hover:SetAllPoints()
+			hover:SetColorTexture(1, 1, 1, 0.08)
 			button:SetScript("OnClick", function() onClick(value.value) end)
 			buttons[i] = button
 		end
+		y = y - 34
 		return function()
+			local alpha = (isActive == nil or isActive()) and 1 or 0.4
 			for i, button in ipairs(buttons) do
-				if values[i].value == current() then button:LockHighlight() else button:UnlockHighlight() end
+				button:SetAlpha(alpha)
+				if values[i].value == current() then
+					button:SetBackdropColor(0.55, 0.40, 0.06, 0.95)
+					button:SetBackdropBorderColor(1, 0.82, 0.2, 1)
+					button.label:SetTextColor(1, 1, 1)
+				else
+					button:SetBackdropColor(0.10, 0.10, 0.13, 0.95)
+					button:SetBackdropBorderColor(0.30, 0.30, 0.35, 1)
+					button.label:SetTextColor(0.7, 0.7, 0.7)
+				end
 			end
 		end
 	end
 
-	local syncFog = AddToggle(-28, "Clear fog", function() return db.enabled end, SetEnabled)
-
-	local strengthCaption = AddCaption(-60, "Fog strength")
-	local hint = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	hint:SetPoint("TOPLEFT", strengthCaption, "BOTTOMLEFT", 0, -3)
-	hint:SetText("Higher = smoother, but costs more FPS")
+	-- Fog
+	Text("GameFontNormal", "Fog", 20)
+	local syncFog = Toggle("Clear fog", function() return db.enabled end, SetEnabled)
+	Text("GameFontHighlightSmall", "Strength", 14)
+	Text("GameFontDisableSmall", "Higher is smoother, but costs more FPS", 18)
 	local strengths = {}
 	for i = 1, MAX_STRENGTH do strengths[i] = { value = i, label = i } end
-	local syncStrength = AddButtonRow(-90, strengths, 34, SetStrength, function() return db.strength end)
+	local syncStrength = Segments(strengths, SetStrength, function() return db.strength end, function() return db.enabled end)
 
-	AddCaption(-124, "Weather effects")
+	Divider()
+
+	-- Weather
+	Text("GameFontNormal", "Weather", 20)
+	Text("GameFontHighlightSmall", "Weather effects", 18)
 	local levels = {}
 	for i = 0, #WEATHER_LEVELS do levels[i + 1] = { value = i, label = WEATHER_LEVELS[i] } end
-	local syncWeather = AddButtonRow(-140, levels, 50, SetWeatherLevel, function() return db.weatherLevel end)
+	local syncWeather = Segments(levels, SetWeatherLevel, function() return db.weatherLevel end)
+	local syncSounds = Toggle("Mute weather sounds", function() return db.muteWeatherSounds end, SetWeatherSounds)
 
-	local syncSounds = AddToggle(-170, "Mute weather sounds", function() return db.muteWeatherSounds end, SetWeatherSounds)
+	win:SetHeight(-y + 8)
 
 	local function Sync()
 		syncFog()
