@@ -367,8 +367,9 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_LOGOUT")
-events:SetScript("OnEvent", function(_, event, name)
+events:SetScript("OnEvent", function(_, event, name, isReload)
 	if event == "ADDON_LOADED" and name == ADDON_NAME then
 		ClearHorizonsDB = ClearHorizonsDB or {}
 		db = ClearHorizonsDB
@@ -380,10 +381,15 @@ events:SetScript("OnEvent", function(_, event, name)
 		db.minimapAngle = db.minimapAngle or 220
 	elseif event == "PLAYER_LOGIN" then
 		BuildMinimapButton()
-		Apply()
+		-- Fog clearing starts on PLAYER_ENTERING_WORLD: flipping during the loading screen leaves the
+		-- world lighting broken (large black areas) until fog is toggled off and on.
+		RestoreLevel()
 		ApplyWeather()
 		ApplyWeatherSounds()
 		C_Timer.NewTicker(2, EnforceWeather)
+	elseif event == "PLAYER_ENTERING_WORLD" and (name or isReload) then -- name = isInitialLogin here
+		-- Same as a manual off/on toggle: real level for the first lit frames, then start flipping.
+		C_Timer.After(5, Apply) -- 2s was too short after a fresh launch; 5s tested by hand
 	elseif event == "PLAYER_LOGOUT" then
 		pulse:SetScript("OnUpdate", nil)
 		RestoreLevel() -- so Config.wtf never saves a mid-flip level
