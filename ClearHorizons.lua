@@ -287,11 +287,30 @@ local function BuildOptions()
 	end
 	win:SetScript("OnShow", Sync)
 	tinsert(listeners, function() if win:IsShown() then Sync() end end)
+
+	-- The window cannot be closed in combat, so it steps aside for the fight and comes back after.
+	win:RegisterEvent("PLAYER_REGEN_DISABLED")
+	win:RegisterEvent("PLAYER_REGEN_ENABLED")
+	win:SetScript("OnEvent", function(self, event)
+		if event == "PLAYER_REGEN_DISABLED" then
+			if self:IsShown() then
+				self.reopen = true
+				self:Hide()
+			end
+		elseif self.reopen then
+			self.reopen = nil
+			self:Show()
+		end
+	end)
 	return win
 end
 
 local function ToggleOptions()
 	options = options or BuildOptions()
+	if InCombatLockdown() then
+		options.reopen = not options.reopen
+		return say(options.reopen and "options will open after combat." or "options will not open after combat.")
+	end
 	options:SetShown(not options:IsShown())
 end
 
