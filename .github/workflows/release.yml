@@ -1,5 +1,5 @@
 # Pushing a version tag (for example v1.2.0) builds the addon zip and publishes it to
-# GitHub Releases and CurseForge with the BigWigs packager.
+# GitHub Releases, CurseForge and Wago with the BigWigs packager.
 name: Release
 
 on:
@@ -14,6 +14,7 @@ jobs:
       contents: write # create the GitHub release
     env:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4

@@ -4,6 +4,7 @@
 ## Version: @project-version@
 ## Author: zakarulcodes
 ## X-Curse-Project-ID: 1798976
+## X-Wago-ID: v63QOBGb
 ## SavedVariables: ClearHorizonsDB
 
 ClearHorizons.lua
